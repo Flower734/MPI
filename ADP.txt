@@ -1,0 +1,92 @@
+
+
+vector<unsigned int>& ADP(int* list, vector<index>& idx, int num)
+{
+	vector<unsigned int> S;
+	index* s0 = new index[NUM_THREADS];
+	bool found = true;
+	vector<index> idx_;
+	vector<unsigned int> ans;
+	vector<unsigned int> arr;
+	int rank, size;
+	MPI_Status status;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	
+	for (int k = 0; k < num; k++)
+	{
+		idx_.push_back(idx[list[k]]);
+	}
+	sort(idx_.begin(), idx_.end());
+	int len = idx_[0].arr.size();
+	int length = floor(len / size);
+	unsigned int* s;
+	if (rank == 0) {
+		s = new unsigned int[len - length * (size - 1)];
+		for (int i = 0; i < len - length * (size - 1); i++) {
+			s[i] = idx[list[0]].arr[i + length * (size - 1)];
+		}
+	}
+	else {
+		s = new unsigned int[length];
+		for (int i = 0; i < length; i++) {
+			s[i] = idx[list[0]].arr[i + length * (rank - 1)];
+		}
+	}
+	if (rank == 0) {
+		for (int i = 1; i < size; i++)
+			MPI_Send(&s, length, MPI_UNSIGNED, i, 1, MPI_COMM_WORLD);
+		for (int i = 0; i < len - length * (size - 1); i++) {
+			//遍历每个list，判断s0[t_id].arr[i]是否出现在其他数组
+			bool found = false;
+			for (int j = 1; j < num; j++) {
+				//从第1个数组开始遍历，如果第一个中就没有，则退出循环
+				for (int k = 0; k < idx_[j].len; k++) {
+					if (s[i] == idx_[j].arr[k]) {
+						found = true;
+						break;
+					}
+				}
+				if (found == false) {
+					break;
+				}
+			}
+			if (found == true) {
+				ans.push_back(s[i]);
+			}
+		}
+		//for (int t_id = 0; t_id < size; t_id++) {
+			//S.insert(S.end(), s0[t_id].arr.begin(), s0[t_id].arr.end());
+		//}
+	}
+	else {
+		arr.assign(s, s + sizeof(s));
+		for (int i = 1; i < size; i++) {
+			MPI_Recv(&s, length, MPI_UNSIGNED, i, 1, MPI_COMM_WORLD, MPI_STATUSES_IGNORE);
+			arr.insert(arr.end(), s, s + length);
+		}
+		for (int i = 0; i < length; i++) {
+			//遍历每个list，判断s0[t_id].arr[i]是否出现在其他数组
+			bool found = false;
+			for (int j = 1; j < num; j++) {
+				//从第1个数组开始遍历，如果第一个中就没有，则退出循环
+				for (int k = 0; k < idx_[j].len; k++) {
+					if (s[i] == idx_[j].arr[k]) {
+						found = true;
+						break;
+					}
+				}
+				if (found == false) {
+					break;
+				}
+			}
+			if (found == true) {
+				ans.push_back(s[i]);
+			}
+		}
+		for (int i = 1; i < size; i++) {
+			MPI_Send(&s, length, MPI_UNSIGNED, i, 1, MPI_COMM_WORLD);
+		}
+	}
+	return S;
+}
